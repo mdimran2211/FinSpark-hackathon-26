@@ -7,4 +7,3 @@ database.db
 .env
 .vscode/
 .idea/
-ml/model.pkl
