@@ -1,9 +1,11 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token
 from database.models import db, User
+from utils.audit import save_audit
 import bcrypt
 
 auth = Blueprint("auth", __name__)
+
 
 # ---------------------------------
 # Register API
@@ -22,10 +24,15 @@ def register():
             "message": "Username, Password and Role are required"
         }), 400
 
-    # Check if user already exists
-    existing_user = User.query.filter_by(username=username).first()
+    # User Exists?
+    existing_user = User.query.filter_by(
+        username=username
+    ).first()
 
     if existing_user:
+
+        save_audit(username, "Registration Failed (Username Already Exists)")
+
         return jsonify({
             "message": "Username already exists"
         }), 400
@@ -45,6 +52,12 @@ def register():
 
     db.session.add(new_user)
     db.session.commit()
+
+    # Audit Log
+    save_audit(
+        username,
+        f"New User Registered ({role})"
+    )
 
     return jsonify({
         "message": "User Registered Successfully"
@@ -68,9 +81,17 @@ def login():
         }), 400
 
     # Find User
-    user = User.query.filter_by(username=username).first()
+    user = User.query.filter_by(
+        username=username
+    ).first()
 
     if user is None:
+
+        save_audit(
+            username,
+            "Login Failed (Invalid Username)"
+        )
+
         return jsonify({
             "message": "Invalid Username"
         }), 401
@@ -80,13 +101,25 @@ def login():
         password.encode("utf-8"),
         user.password.encode("utf-8")
     ):
+
+        save_audit(
+            username,
+            "Login Failed (Wrong Password)"
+        )
+
         return jsonify({
             "message": "Invalid Password"
         }), 401
 
-    # Generate JWT Token (Identity MUST be a string)
+    # Successful Login
     access_token = create_access_token(
         identity=user.username
+    )
+
+    # Audit Log
+    save_audit(
+        username,
+        "User Logged In Successfully"
     )
 
     return jsonify({
