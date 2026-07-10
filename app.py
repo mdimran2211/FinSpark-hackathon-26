@@ -29,6 +29,9 @@ app.config.from_object(config)
 # -----------------------------
 # Enable CORS
 # -----------------------------
+# -----------------------------
+# Enable CORS
+# -----------------------------
 CORS(
     app,
     resources={
@@ -36,6 +39,7 @@ CORS(
             "origins": [
                 "http://localhost:5173",
                 "http://127.0.0.1:5173",
+                "https://threat-shield-ai-frontend.vercel.app",
             ]
         }
     },
