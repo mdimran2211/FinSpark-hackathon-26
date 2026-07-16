@@ -1,0 +1,1795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuantumShield AI — Insider Threat Detection</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0e17; --bg2:#0d1220; --panel:#111827; --panel2:#151d2e;
+    --border:#232f45; --border-soft:#1a2436;
+    --text:#e7edf7; --muted:#7c8aa5; --dim:#4d5a72;
+    --cyan:#43e7de; --cyan-dim:#1f5a58;
+    --amber:#ffb648; --crimson:#ff5470; --violet:#a78bfa; --green:#3fd68c;
+    --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:
+      radial-gradient(1200px 600px at 85% -10%, #10203a 0%, transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, #1a1030 0%, transparent 55%),
+      var(--bg);
+    color:var(--text); font-family:var(--sans); min-height:100vh;}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;
+    padding:14px 26px;border-bottom:1px solid var(--border-soft);
+    background:linear-gradient(180deg,rgba(17,24,39,.9),rgba(17,24,39,.5));backdrop-filter:blur(6px);
+    position:sticky;top:0;z-index:50;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand .mark{width:34px;height:34px;position:relative;flex:none;}
+  .brand h1{font-size:16px;letter-spacing:.4px;margin:0;font-weight:700;}
+  .brand .tag{font-size:11px;color:var(--muted);margin-top:1px;letter-spacing:.3px;}
+  .status-pills{display:flex;gap:10px;flex-wrap:wrap;}
+  .pill{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);
+    background:var(--panel2);border:1px solid var(--border-soft);border-radius:20px;padding:5px 11px;font-family:var(--mono);}
+  .pill .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);}
+  .pill.warn .dot{background:var(--amber);box-shadow:0 0 8px var(--amber);}
+  .pill.crit .dot{background:var(--crimson);box-shadow:0 0 8px var(--crimson);}
+
+  .tabs{display:flex;gap:2px;padding:0 26px;border-bottom:1px solid var(--border-soft);background:var(--bg2);
+    overflow-x:auto;}
+  .tab{padding:13px 18px;font-size:13px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;
+    white-space:nowrap;font-weight:600;letter-spacing:.2px;transition:.15s;}
+  .tab:hover{color:var(--text);}
+  .tab.active{color:var(--cyan);border-bottom-color:var(--cyan);}
+
+  .view{display:none;padding:22px 26px 60px;max-width:1400px;margin:0 auto;}
+  .view.active{display:block;animation:fadein .25s ease;}
+  @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+  .grid{display:grid;gap:16px;}
+  .g-kpis{grid-template-columns:repeat(5,1fr);}
+  .g-2{grid-template-columns:1.6fr 1fr;}
+  .g-charts{grid-template-columns:1.4fr 1fr;}
+
+  .card{background:var(--panel);border:1px solid var(--border-soft);border-radius:12px;padding:18px;}
+  .card h3{margin:0 0 4px;font-size:13px;letter-spacing:.3px;color:var(--text);}
+  .card .sub{font-size:11.5px;color:var(--dim);margin-bottom:12px;}
+
+  .kpi{padding:16px;}
+  .kpi .n{font-size:28px;font-weight:800;font-family:var(--mono);}
+  .kpi .l{font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:.3px;text-transform:uppercase;}
+  .kpi.crit .n{color:var(--crimson);} .kpi.high .n{color:var(--amber);}
+  .kpi.cyan .n{color:var(--cyan);} .kpi.violet .n{color:var(--violet);}
+
+  canvas{max-height:260px;}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th{text-align:left;color:var(--dim);font-weight:600;font-size:10.5px;text-transform:uppercase;
+    letter-spacing:.4px;padding:8px 10px;border-bottom:1px solid var(--border-soft);}
+  td{padding:9px 10px;border-bottom:1px solid var(--border-soft);}
+  tr.rowhover:hover{background:rgba(67,231,222,.04);cursor:pointer;}
+
+  .sev{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;
+    padding:3px 9px;border-radius:20px;border:1px solid; font-weight:600;}
+  .sev.critical{color:var(--crimson);border-color:rgba(255,84,112,.4);background:rgba(255,84,112,.08);}
+  .sev.high{color:var(--amber);border-color:rgba(255,182,72,.4);background:rgba(255,182,72,.08);}
+  .sev.medium{color:var(--cyan);border-color:rgba(67,231,222,.4);background:rgba(67,231,222,.08);}
+  .sev.low{color:var(--green);border-color:rgba(63,214,140,.4);background:rgba(63,214,140,.08);}
+
+  .gauge-wrap{display:flex;align-items:center;gap:8px;}
+  .gauge-num{font-family:var(--mono);font-weight:700;font-size:13px;}
+
+  /* Alerts / XAI */
+  .alert-list{display:flex;flex-direction:column;gap:10px;}
+  .alert-row{background:var(--panel2);border:1px solid var(--border-soft);border-radius:10px;padding:14px 16px;
+    cursor:pointer;transition:.15s;}
+  .alert-row:hover{border-color:var(--cyan-dim);}
+  .alert-row .top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+  .alert-row .who{font-weight:700;font-size:13.5px;}
+  .alert-row .meta{font-size:11.5px;color:var(--muted);margin-top:2px;font-family:var(--mono);}
+  .alert-detail{margin-top:14px;padding-top:14px;border-top:1px dashed var(--border-soft);display:none;}
+  .alert-row.open .alert-detail{display:block;}
+  .factor{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-soft);
+    font-size:12.5px;}
+  .factor:last-child{border-bottom:none;}
+  .factor .f-name{color:var(--text);}
+  .factor .f-ev{color:var(--dim);font-family:var(--mono);font-size:11px;}
+  .bar-bg{background:#0c1220;border-radius:6px;height:6px;width:120px;overflow:hidden;}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--violet));}
+  .action-box{margin-top:12px;padding:12px 14px;background:#0c1524;border:1px solid var(--border-soft);
+    border-radius:8px;font-size:12.5px;color:var(--text);}
+  .action-box b{color:var(--amber);}
+  .btnrow{display:flex;gap:8px;margin-top:12px;}
+  .btn{font-family:var(--sans);font-size:12px;font-weight:600;padding:8px 14px;border-radius:7px;border:1px solid var(--border-soft);
+    background:#0c1524;color:var(--text);cursor:pointer;transition:.15s;}
+  .btn:hover{border-color:var(--cyan);color:var(--cyan);}
+  .btn.primary{background:var(--cyan);color:#04191a;border-color:var(--cyan);}
+  .btn.primary:hover{opacity:.85;color:#04191a;}
+  .btn.danger{background:rgba(255,84,112,.12);color:var(--crimson);border-color:rgba(255,84,112,.4);}
+  .btn:disabled{opacity:.4;cursor:default;}
+  .tagchip{font-size:10px;padding:2px 7px;border-radius:5px;background:#0c1524;color:var(--muted);
+    border:1px solid var(--border-soft);font-family:var(--mono);}
+
+  /* Simulator */
+  .sim-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
+  .sim-card{background:var(--panel2);border:1px solid var(--border-soft);border-radius:10px;padding:14px;
+    display:flex;flex-direction:column;gap:8px;}
+  .sim-card .cat{font-size:10px;color:var(--violet);text-transform:uppercase;letter-spacing:.4px;font-weight:700;}
+  .sim-card h4{margin:0;font-size:13.5px;}
+  .sim-card p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.5;flex:1;}
+  .sim-result{margin-top:16px;padding:16px;background:var(--panel2);border-radius:10px;border:1px solid var(--border-soft);}
+
+  /* Audit log */
+  .ledger{display:flex;flex-direction:column;gap:0;}
+  .ledger-row{display:grid;grid-template-columns:110px 140px 1fr 90px;gap:10px;padding:10px 8px;
+    border-bottom:1px solid var(--border-soft);font-size:11.5px;align-items:center;}
+  .ledger-row .hash{font-family:var(--mono);color:var(--dim);font-size:10.5px;}
+  .ledger-row .action{font-weight:600;}
+  .chain-link{color:var(--dim);font-size:10px;}
+  .verify-badge{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;
+    padding:8px 14px;border-radius:8px;border:1px solid;}
+  .verify-badge.ok{color:var(--green);border-color:rgba(63,214,140,.4);background:rgba(63,214,140,.08);}
+  .verify-badge.bad{color:var(--crimson);border-color:rgba(255,84,112,.4);background:rgba(255,84,112,.08);}
+
+  /* Assistant */
+  .chatlog{display:flex;flex-direction:column;gap:12px;max-height:420px;overflow-y:auto;padding:4px 2px;}
+  .msg{max-width:75%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.5;}
+  .msg.user{align-self:flex-end;background:var(--cyan);color:#04191a;font-weight:500;}
+  .msg.bot{align-self:flex-start;background:var(--panel2);border:1px solid var(--border-soft);}
+  .chat-input-row{display:flex;gap:8px;margin-top:14px;}
+  .chat-input-row input{flex:1;padding:11px 14px;background:#0c1524;border:1px solid var(--border-soft);
+    border-radius:8px;color:var(--text);font-size:13px;}
+  .chat-input-row input:focus{outline:none;border-color:var(--cyan);}
+  .suggest{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+  .suggest span{font-size:11px;padding:5px 10px;border-radius:14px;background:#0c1524;color:var(--muted);
+    border:1px solid var(--border-soft);cursor:pointer;}
+  .suggest span:hover{color:var(--cyan);border-color:var(--cyan-dim);}
+
+  .footnote{font-size:11px;color:var(--dim);margin-top:18px;line-height:1.6;}
+  .footnote code{background:#0c1524;padding:1px 5px;border-radius:4px;color:var(--muted);}
+  @media(max-width:900px){
+    .g-kpis{grid-template-columns:repeat(2,1fr);} .g-2{grid-template-columns:1fr;} .g-charts{grid-template-columns:1fr;}
+    .ledger-row{grid-template-columns:80px 1fr;grid-template-areas:"a b" "c c" "d d";}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 40 40" fill="none">
+      <polygon points="20,2 36,11 36,29 20,38 4,29 4,11" stroke="#43e7de" stroke-width="1.5" fill="rgba(67,231,222,.06)"/>
+      <circle cx="20" cy="20" r="6" fill="#43e7de"/>
+      <circle cx="20" cy="8" r="2.2" fill="#a78bfa"/>
+      <circle cx="31" cy="26" r="2.2" fill="#a78bfa"/>
+      <circle cx="9" cy="26" r="2.2" fill="#a78bfa"/>
+      <line x1="20" y1="14" x2="20" y2="9.5" stroke="#a78bfa" stroke-width="1"/>
+      <line x1="25" y1="23" x2="29.5" y2="25.3" stroke="#a78bfa" stroke-width="1"/>
+      <line x1="15" y1="23" x2="10.5" y2="25.3" stroke="#a78bfa" stroke-width="1"/>
+    </svg>
+    <div><h1>QuantumShield AI</h1><div class="tag">Explainable Insider Threat Detection for Banks</div></div>
+  </div>
+  <div class="status-pills">
+    <div class="pill"><span class="dot"></span><span id="pill-employees">45 employees monitored</span></div>
+    <div class="pill warn"><span class="dot"></span><span id="pill-alerts">— alerts</span></div>
+    <div class="pill"><span class="dot"></span>Post-Quantum Audit: <span id="pill-chain">verified</span></div>
+    <div class="pill"><span class="dot"></span>Isolation Forest: online</div>
+  </div>
+</div>
+
+<div class="tabs" id="tabs">
+  <div class="tab active" data-view="overview">Overview</div>
+  <div class="tab" data-view="alerts">Alerts &amp; XAI</div>
+  <div class="tab" data-view="simulator">Attack Simulator</div>
+  <div class="tab" data-view="audit">Audit Log (PQC)</div>
+  <div class="tab" data-view="assistant">AI Security Assistant</div>
+</div>
+
+<!-- ============ OVERVIEW ============ -->
+<div class="view active" id="view-overview">
+  <div class="grid g-kpis" style="margin-bottom:16px;">
+    <div class="card kpi cyan"><div class="n" id="k-employees">45</div><div class="l">Employees Monitored</div></div>
+    <div class="card kpi"><div class="n" id="k-alerts">0</div><div class="l">Total Alerts</div></div>
+    <div class="card kpi crit"><div class="n" id="k-critical">0</div><div class="l">Critical</div></div>
+    <div class="card kpi high"><div class="n" id="k-high">0</div><div class="l">High</div></div>
+    <div class="card kpi violet"><div class="n" id="k-locked">0</div><div class="l">Accounts Locked</div></div>
+  </div>
+
+  <div class="grid g-charts" style="margin-bottom:16px;">
+    <div class="card"><h3>Company-wide Risk Trend</h3><div class="sub">Average hybrid risk score across all 45 employees, 30-day window</div>
+      <canvas id="chart-trend"></canvas>
+    </div>
+    <div class="card"><h3>Department Risk Comparison</h3><div class="sub">Average risk score by department</div>
+      <canvas id="chart-dept"></canvas>
+    </div>
+  </div>
+
+  <div class="grid g-2">
+    <div class="card">
+      <h3>Employee Risk Leaderboard</h3><div class="sub">Highest observed risk score per employee</div>
+      <table><thead><tr><th>Employee</th><th>Department</th><th>Role</th><th>Peak Risk</th></tr></thead>
+        <tbody id="leaderboard-body"></tbody></table>
+    </div>
+    <div class="card">
+      <h3>Detection Engine</h3><div class="sub">Hybrid scoring composition</div>
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.7;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span>Rule-based weight</span><b style="color:var(--cyan)">55%</b></div>
+        <div class="bar-bg" style="width:100%;margin-bottom:14px;"><div class="bar-fill" style="width:55%"></div></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span>Isolation Forest weight</span><b style="color:var(--violet)">45%</b></div>
+        <div class="bar-bg" style="width:100%;margin-bottom:14px;"><div class="bar-fill" style="width:45%;background:linear-gradient(90deg,var(--violet),var(--crimson));"></div></div>
+        <div class="footnote">
+          8 weighted behavioral features feed the rule engine (downloads, USB volume, admin commands, off-hours access,
+          VIP record access, distinct IPs, failed logins, DB query volume). A <code>scikit-learn IsolationForest</code>
+          fit on the population baseline catches combinatorial anomalies fixed rules miss.
+          On this dataset the engine detects <b style="color:var(--text)">7 of 9</b> injected insider-threat
+          patterns above the alert threshold — a realistic detection rate, not a rigged 100%.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ALERTS ============ -->
+<div class="view" id="view-alerts">
+  <div class="card" style="margin-bottom:16px;">
+    <h3>Live Alert Feed</h3>
+    <div class="sub">Click an alert to see its full Explainable AI breakdown, confidence score, and recommended action.</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;" id="alert-filters">
+      <span class="tagchip" data-f="all" style="cursor:pointer;">All</span>
+      <span class="tagchip" data-f="critical" style="cursor:pointer;">Critical</span>
+      <span class="tagchip" data-f="high" style="cursor:pointer;">High</span>
+      <span class="tagchip" data-f="medium" style="cursor:pointer;">Medium</span>
+    </div>
+    <div class="alert-list" id="alert-list"></div>
+  </div>
+</div>
+
+<!-- ============ SIMULATOR ============ -->
+<div class="view" id="view-simulator">
+  <div class="card">
+    <h3>Live Attack Simulator</h3>
+    <div class="sub">Nine simulated insider-attack scenarios, each processed through the same hybrid risk engine and XAI
+      module used on real activity. Pick a scenario to run it against a randomly selected demo employee.</div>
+    <div class="sim-grid" id="sim-grid"></div>
+    <div class="sim-result" id="sim-result" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- ============ AUDIT LOG ============ -->
+<div class="view" id="view-audit">
+  <div class="card" style="margin-bottom:16px;">
+    <h3>Post-Quantum Signed Audit Log</h3>
+    <div class="sub">Every sensitive action is appended to a SHA-256 hash chain and signed. Tampering with any past
+      entry breaks the chain from that point forward — this is what makes it tamper-<i>evident</i>, not merely tamper-logged.</div>
+    <div style="display:flex;align-items:center;gap:14px;margin:12px 0 18px;flex-wrap:wrap;">
+      <button class="btn primary" id="btn-verify">Verify Chain Integrity</button>
+      <button class="btn danger" id="btn-tamper">Simulate Tampering (demo)</button>
+      <span id="verify-result"></span>
+    </div>
+    <div class="ledger" id="ledger-body"></div>
+    <div class="footnote">
+      Hashing here runs live in your browser via <code>crypto.subtle.digest('SHA-256', …)</code> over each entry
+      chained to the previous entry's hash — the same chain-of-custody construction the backend implements
+      server-side in <code>security/pqc.py</code>. Signatures shown as <code>SIM-HBS</code> represent the
+      dependency-free hash-based signer used for local development; production deployments switch
+      <code>PQC_BACKEND=liboqs</code> for real NIST-standardized ML-DSA / CRYSTALS-Dilithium3 signatures.
+    </div>
+  </div>
+</div>
+
+<!-- ============ ASSISTANT ============ -->
+<div class="view" id="view-assistant">
+  <div class="card">
+    <h3>AI Security Assistant</h3>
+    <div class="sub">Ask about alerts, risk, locked accounts, or audit integrity — answered from live platform data.</div>
+    <div class="chatlog" id="chatlog"></div>
+    <div class="suggest">
+      <span>How many critical alerts are open?</span>
+      <span>Which accounts are locked?</span>
+      <span>Who is the riskiest employee?</span>
+      <span>Is the audit log tamper-proof?</span>
+      <span>Treasury department risk?</span>
+    </div>
+    <div class="chat-input-row">
+      <input id="chat-input" type="text" placeholder="Ask the assistant a question…"/>
+      <button class="btn primary" id="chat-send">Ask</button>
+    </div>
+  </div>
+</div>
+
+<script id="data-employees" type="application/json">[
+  {
+    "employee_id": "EMP001",
+    "name": "James B.",
+    "department": "Loan Processing",
+    "role": "Loan Officer",
+    "privilege_level": "elevated",
+    "tenure_months": 72,
+    "baseline_login_hour": 8.8,
+    "baseline_files_per_day": 17,
+    "baseline_db_queries_per_day": 4
+  },
+  {
+    "employee_id": "EMP002",
+    "name": "Maria C.",
+    "department": "Wealth Management",
+    "role": "Financial Advisor",
+    "privilege_level": "elevated",
+    "tenure_months": 28,
+    "baseline_login_hour": 9.6,
+    "baseline_files_per_day": 16,
+    "baseline_db_queries_per_day": 2
+  },
+  {
+    "employee_id": "EMP003",
+    "name": "David D.",
+    "department": "Loan Processing",
+    "role": "Loan Officer",
+    "privilege_level": "standard",
+    "tenure_months": 10,
+    "baseline_login_hour": 9.6,
+    "baseline_files_per_day": 22,
+    "baseline_db_queries_per_day": 2
+  },
+  {
+    "employee_id": "EMP004",
+    "name": "Sarah E.",
+    "department": "Retail Banking",
+    "role": "Teller",
+    "privilege_level": "standard",
+    "tenure_months": 131,
+    "baseline_login_hour": 8.9,
+    "baseline_files_per_day": 15,
+    "baseline_db_queries_per_day": 2
+  },
+  {
+    "employee_id": "EMP005",
+    "name": "Ahmed F.",
+    "department": "Treasury",
+    "role": "Treasury Analyst",
+    "privilege_level": "standard",
+    "tenure_months": 168,
+    "baseline_login_hour": 8.7,
+    "baseline_files_per_day": 6,
+    "baseline_db_queries_per_day": 0
+  },
+  {
+    "employee_id": "EMP006",
+    "name": "Wei G.",
+    "department": "Loan Processing",
+    "role": "Underwriter",
+    "privilege_level": "standard",
+    "tenure_months": 152,
+    "baseline_login_hour": 8.1,
+    "baseline_files_per_day": 11,
+    "baseline_db_queries_per_day": 3
+  },
+  {
+    "employee_id": "EMP007",
+    "name": "Priya H.",
+    "department": "IT Operations",
+    "role": "Sysadmin",
+    "privilege_level": "admin",
+    "tenure_months": 42,
+    "baseline_login_hour": 7.9,
+    "baseline_files_per_day": 9,
+    "baseline_db_queries_per_day": 19
+  },
+  {
+    "employee_id": "EMP008",
+    "name": "John I.",
+    "department": "Loan Processing",
+    "role": "Underwriter",
+    "privilege_level": "standard",
+    "tenure_months": 41,
+    "baseline_login_hour": 8.3,
+    "baseline_files_per_day": 18,
+    "baseline_db_queries_per_day": 0
+  },
+  {
+    "employee_id": "EMP009",
+    "name": "Elena J.",
+    "department": "Wealth Management",
+    "role": "Portfolio Manager",
+    "privilege_level": "elevated",
+    "tenure_months": 99,
+    "baseline_login_hour": 8.1,
+    "baseline_files_per_day": 18,
+    "baseline_db_queries_per_day": 0
+  },
+  {
+    "employee_id": "EMP010",
+    "name": "Carlos K.",
+    "department": "Retail Banking",
+    "role": "Branch Manager",
+    "privilege_level": "admin",
+    "tenure_months": 90,
+    "baseline_login_hour": 8.8,
+    "baseline_files_per_day": 14,
+    "baseline_db_queries_per_day": 2
+  },
+  {
+    "employee_id": "EMP011",
+    "name": "Fatima L.",
+    "department": "Treasury",
+    "role": "Treasury Manager",
+    "privilege_level": "standard",
+    "tenure_months": 119,
+    "baseline_login_hour": 8.1,
+    "baseline_files_per_day": 29,
+    "baseline_db_queries_per_day": 2
+  },
+  {
+    "employee_id": "EMP012",
+    "name": "Michael M.",
+    "department": "Treasury",
+    "role": "Treasury Analyst",
+    "privilege_level": "standard",
+    "tenure_months": 98,
+    "baseline_login_hour": 7.8,
+    "baseline_files_per_day": 22,
+    "baseline_db_queries_per_day": 0
+  },
+  {
+    "employee_id": "EMP013",
+    "name": "Anna N.",
+    "department": "Retail Banking",
+    "role": "Personal Banker",
+    "privilege_level": "standard",
+    "tenure_months": 162,
+    "baseline_login_hour": 8.6,
+    "baseline_files_per_day": 6,
+    "baseline_db_queries_per_day": 0
+  },
+  {
+    "employee_id": "EMP014",
+    "name": "Ravi O.",
+    "department": "Treasury",
+    "role": "Treasury Manager",
+    "privilege_level": "standard",
+    "tenure_months": 19,
+    "baseline_login_hour": 8.6,
+    "baseline_files_per_day": 22,
+    "baseline_db_queries_per_day": 3
+  },
+  {
+    "employee_id": "EMP015",
+    "name": "Sofia P.",
+    "department": "Retail Banking",
+    "role": "Personal Banker",
+    "privilege_level": "standard",
+    "tenure_months": 76,
+    "baseline_login_hour": 8.4,
+    "baseline_files_per_day": 16,
+    "baseline_db_queries_per_day": 0
+  },
+  {
+    "employee_id": "EMP016",
+    "name": "Daniel Q.",
+    "department": "Retail Banking",
+    "role": "Teller",
+    "privilege_level": "standard",
+    "tenure_months": 99,
+    "baseline_login_hour": 8.0,
+    "baseline_files_per_day": 15,
+    "baseline_db_queries_per_day": 5
+  },
+  {
+    "employee_id": "EMP017",
+    "name": "Nina R.",
+    "department": "IT Operations",
+    "role": "IT Support",
+    "privilege_level": "standard",
+    "tenure_months": 95,
+    "baseline_login_hour": 8.7,
+    "baseline_files_per_day": 7,
+    "baseline_db_queries_per_day": 3
+  },
+  {
+    "employee_id": "EMP018",
+    "name": "Omar S.",
+    "department": "Wealth Management",
+    "role": "Portfolio Manager",
+    "privilege_level": "standard",
+    "tenure_months": 173,
+    "baseline_login_hour": 8.2,
+    "baseline_files_per_day": 13,
+    "baseline_db_queries_per_day": 4
+  },
+  {
+    "employee_id": "EMP019",
+    "name": "Grace T.",
+    "department": "IT Operations",
+    "role": "Sysadmin",
+    "privilege_level": "admin",
+    "tenure_months": 157,
+    "baseline_login_hour": 9.2,
+    "baseline_files_per_day": 23,
+    "baseline_db_queries_per_day": 7
+  },
+  {
+    "employee_id": "EMP020",
+    "name": "Lucas U.",
+    "department": "Loan Processing",
+    "role": "Loan Officer",
+    "privilege_level": "standard",
+    "tenure_months": 64,
+    "baseline_login_hour": 8.3,
+    "baseline_files_per_day": 19,
+    "baseline_db_queries_per_day": 4
+  },
+  {
+    "employee_id": "EMP021",
+    "name": "Aisha V.",
+    "department": "Wealth Management",
+    "role": "Portfolio Manager",
+    "privilege_level": "standard",
+    "tenure_months": 165,
+    "baseline_login_hour": 8.2,
+    "baseline_files_per_day": 16,
+    "baseline_db_queries_per_day": 0
+  },
+  {
+    "employee_id": "EMP022",
+    "name": "Tom W.",
+    "department": "Loan Processing",
+    "role": "Loan Officer",
+    "privilege_level": "standard",
+    "tenure_months": 16,
+    "baseline_login_hour": 7.7,
+    "baseline_files_per_day": 22,
+    "baseline_db_queries_per_day": 5
+  },
+  {
+    "employee_id": "EMP023",
+    "name": "Yuki X.",
+    "department": "Wealth Management",
+    "role": "Financial Advisor",
+    "privilege_level": "standard",
+    "tenure_months": 104,
+    "baseline_login_hour": 8.4,
+    "baseline_files_per_day": 24,
+    "baseline_db_queries_per_day": 3
+  },
+  {
+    "employee_id": "EMP024",
+    "name": "Ines Y.",
+    "department": "IT Operations",
+    "role": "Sysadmin",
+    "privilege_level": "admin",
+    "tenure_months": 56,
+    "baseline_login_hour": 8.0,
+    "baseline_files_per_day": 20,
+    "baseline_db_queries_per_day": 19
+  },
+  {
+    "employee_id": "EMP025",
+    "name": "Noah Z.",
+    "department": "Treasury",
+    "role": "Treasury Manager",
+    "privilege_level": "standard",
+    "tenure_months": 129,
+    "baseline_login_hour": 8.5,
+    "baseline_files_per_day": 27,
+    "baseline_db_queries_per_day": 0
+  },
+  {
+    "employee_id": "EMP026",
+    "name": "Layla A.",
+    "department": "Compliance",
+    "role": "Auditor",
+    "privilege_level": "elevated",
+    "tenure_months": 37,
+    "baseline_login_hour": 9.1,
+    "baseline_files_per_day": 18,
+    "baseline_db_queries_per_day": 2
+  },
+  {
+    "employee_id": "EMP027",
+    "name": "Peter B.",
+    "department": "Wealth Management",
+    "role": "Portfolio Manager",
+    "privilege_level": "standard",
+    "tenure_months": 111,
+    "baseline_login_hour": 8.6,
+    "baseline_files_per_day": 6,
+    "baseline_db_queries_per_day": 2
+  },
+  {
+    "employee_id": "EMP028",
+    "name": "Mei C.",
+    "department": "Treasury",
+    "role": "Treasury Manager",
+    "privilege_level": "standard",
+    "tenure_months": 37,
+    "baseline_login_hour": 8.7,
+    "baseline_files_per_day": 26,
+    "baseline_db_queries_per_day": 1
+  },
+  {
+    "employee_id": "EMP029",
+    "name": "Karim D.",
+    "department": "Treasury",
+    "role": "Treasury Manager",
+    "privilege_level": "elevated",
+    "tenure_months": 14,
+    "baseline_login_hour": 7.9,
+    "baseline_files_per_day": 14,
+    "baseline_db_queries_per_day": 4
+  },
+  {
+    "employee_id": "EMP030",
+    "name": "Emma E.",
+    "department": "Customer Support",
+    "role": "Support Agent",
+    "privilege_level": "standard",
+    "tenure_months": 42,
+    "baseline_login_hour": 8.7,
+    "baseline_files_per_day": 14,
+    "baseline_db_queries_per_day": 4
+  },
+  {
+    "employee_id": "EMP031",
+    "name": "Ivan F.",
+    "department": "Customer Support",
+    "role": "Support Lead",
+    "privilege_level": "standard",
+    "tenure_months": 100,
+    "baseline_login_hour": 8.6,
+    "baseline_files_per_day": 23,
+    "baseline_db_queries_per_day": 1
+  },
+  {
+    "employee_id": "EMP032",
+    "name": "Zara G.",
+    "department": "Compliance",
+    "role": "Auditor",
+    "privilege_level": "standard",
+    "tenure_months": 143,
+    "baseline_login_hour": 8.3,
+    "baseline_files_per_day": 15,
+    "baseline_db_queries_per_day": 0
+  },
+  {
+    "employee_id": "EMP033",
+    "name": "Sam H.",
+    "department": "Customer Support",
+    "role": "Support Agent",
+    "privilege_level": "standard",
+    "tenure_months": 31,
+    "baseline_login_hour": 8.7,
+    "baseline_files_per_day": 19,
+    "baseline_db_queries_per_day": 3
+  },
+  {
+    "employee_id": "EMP034",
+    "name": "Chloe I.",
+    "department": "Loan Processing",
+    "role": "Underwriter",
+    "privilege_level": "standard",
+    "tenure_months": 89,
+    "baseline_login_hour": 8.3,
+    "baseline_files_per_day": 9,
+    "baseline_db_queries_per_day": 2
+  },
+  {
+    "employee_id": "EMP035",
+    "name": "Hassan J.",
+    "department": "Retail Banking",
+    "role": "Branch Manager",
+    "privilege_level": "admin",
+    "tenure_months": 113,
+    "baseline_login_hour": 8.3,
+    "baseline_files_per_day": 13,
+    "baseline_db_queries_per_day": 2
+  },
+  {
+    "employee_id": "EMP036",
+    "name": "Olga K.",
+    "department": "Wealth Management",
+    "role": "Portfolio Manager",
+    "privilege_level": "elevated",
+    "tenure_months": 69,
+    "baseline_login_hour": 8.8,
+    "baseline_files_per_day": 29,
+    "baseline_db_queries_per_day": 3
+  },
+  {
+    "employee_id": "EMP037",
+    "name": "Ben L.",
+    "department": "Treasury",
+    "role": "Treasury Analyst",
+    "privilege_level": "standard",
+    "tenure_months": 29,
+    "baseline_login_hour": 8.7,
+    "baseline_files_per_day": 17,
+    "baseline_db_queries_per_day": 0
+  },
+  {
+    "employee_id": "EMP038",
+    "name": "Rosa M.",
+    "department": "Customer Support",
+    "role": "Support Lead",
+    "privilege_level": "standard",
+    "tenure_months": 131,
+    "baseline_login_hour": 8.5,
+    "baseline_files_per_day": 18,
+    "baseline_db_queries_per_day": 7
+  },
+  {
+    "employee_id": "EMP039",
+    "name": "Kenji N.",
+    "department": "Treasury",
+    "role": "Treasury Analyst",
+    "privilege_level": "standard",
+    "tenure_months": 43,
+    "baseline_login_hour": 8.4,
+    "baseline_files_per_day": 19,
+    "baseline_db_queries_per_day": 2
+  },
+  {
+    "employee_id": "EMP040",
+    "name": "Amara O.",
+    "department": "Treasury",
+    "role": "Treasury Analyst",
+    "privilege_level": "standard",
+    "tenure_months": 127,
+    "baseline_login_hour": 7.7,
+    "baseline_files_per_day": 24,
+    "baseline_db_queries_per_day": 4
+  },
+  {
+    "employee_id": "EMP041",
+    "name": "Leo P.",
+    "department": "Retail Banking",
+    "role": "Teller",
+    "privilege_level": "standard",
+    "tenure_months": 80,
+    "baseline_login_hour": 9.1,
+    "baseline_files_per_day": 12,
+    "baseline_db_queries_per_day": 5
+  },
+  {
+    "employee_id": "EMP042",
+    "name": "Nadia Q.",
+    "department": "Wealth Management",
+    "role": "Financial Advisor",
+    "privilege_level": "standard",
+    "tenure_months": 147,
+    "baseline_login_hour": 7.5,
+    "baseline_files_per_day": 21,
+    "baseline_db_queries_per_day": 7
+  },
+  {
+    "employee_id": "EMP043",
+    "name": "Victor R.",
+    "department": "Retail Banking",
+    "role": "Teller",
+    "privilege_level": "standard",
+    "tenure_months": 19,
+    "baseline_login_hour": 7.8,
+    "baseline_files_per_day": 14,
+    "baseline_db_queries_per_day": 3
+  },
+  {
+    "employee_id": "EMP044",
+    "name": "Priscilla S.",
+    "department": "Customer Support",
+    "role": "Support Agent",
+    "privilege_level": "elevated",
+    "tenure_months": 123,
+    "baseline_login_hour": 8.1,
+    "baseline_files_per_day": 8,
+    "baseline_db_queries_per_day": 3
+  },
+  {
+    "employee_id": "EMP045",
+    "name": "Dmitri T.",
+    "department": "Treasury",
+    "role": "Treasury Analyst",
+    "privilege_level": "standard",
+    "tenure_months": 157,
+    "baseline_login_hour": 7.8,
+    "baseline_files_per_day": 20,
+    "baseline_db_queries_per_day": 1
+  }
+]</script>
+<script id="data-alerts" type="application/json">[
+  {
+    "alert_id": "ALT-0009",
+    "employee_id": "EMP042",
+    "employee_name": "Nadia Q.",
+    "department": "Wealth Management",
+    "role": "Financial Advisor",
+    "date": "2026-07-04",
+    "risk_score": 100.0,
+    "severity": "critical",
+    "confidence_pct": 89.7,
+    "rule_score": 100.0,
+    "isolation_forest_score": 100.0,
+    "xai_reasons": [
+      {
+        "factor": "Unusual volume of file downloads",
+        "evidence": "files_downloaded = 231",
+        "weight_pct": 72.8
+      },
+      {
+        "factor": "Large USB data transfer detected",
+        "evidence": "usb_bytes_mb = 1048.7",
+        "weight_pct": 25.6
+      },
+      {
+        "factor": "Isolation Forest flagged this behavior as a statistical outlier vs. peer baseline",
+        "evidence": "anomaly_score = 100.0/100",
+        "weight_pct": null
+      }
+    ],
+    "recommended_action": "AUTO-CONTAIN: Lock account immediately, revoke active sessions, notify SOC + compliance.",
+    "auto_contained": true,
+    "ground_truth_label": "malicious"
+  },
+  {
+    "alert_id": "ALT-0005",
+    "employee_id": "EMP019",
+    "employee_name": "Grace T.",
+    "department": "IT Operations",
+    "role": "Sysadmin",
+    "date": "2026-07-02",
+    "risk_score": 95.2,
+    "severity": "critical",
+    "confidence_pct": 91.8,
+    "rule_score": 100.0,
+    "isolation_forest_score": 89.4,
+    "xai_reasons": [
+      {
+        "factor": "Large USB data transfer detected",
+        "evidence": "usb_bytes_mb = 3118.7",
+        "weight_pct": 75.3
+      },
+      {
+        "factor": "Unusual volume of file downloads",
+        "evidence": "files_downloaded = 77",
+        "weight_pct": 23.5
+      },
+      {
+        "factor": "Isolation Forest flagged this behavior as a statistical outlier vs. peer baseline",
+        "evidence": "anomaly_score = 89.4/100",
+        "weight_pct": null
+      }
+    ],
+    "recommended_action": "AUTO-CONTAIN: Lock account immediately, revoke active sessions, notify SOC + compliance.",
+    "auto_contained": true,
+    "ground_truth_label": "malicious"
+  },
+  {
+    "alert_id": "ALT-0001",
+    "employee_id": "EMP004",
+    "employee_name": "Sarah E.",
+    "department": "Retail Banking",
+    "role": "Teller",
+    "date": "2026-06-27",
+    "risk_score": 88.5,
+    "severity": "critical",
+    "confidence_pct": 91.8,
+    "rule_score": 95.1,
+    "isolation_forest_score": 80.5,
+    "xai_reasons": [
+      {
+        "factor": "Unusual volume of file downloads",
+        "evidence": "files_downloaded = 134",
+        "weight_pct": 88.6
+      },
+      {
+        "factor": "Multiple/unusual source IP addresses used",
+        "evidence": "distinct_ip_count = 2",
+        "weight_pct": 11.4
+      },
+      {
+        "factor": "Isolation Forest flagged this behavior as a statistical outlier vs. peer baseline",
+        "evidence": "anomaly_score = 80.5/100",
+        "weight_pct": null
+      }
+    ],
+    "recommended_action": "AUTO-CONTAIN: Lock account immediately, revoke active sessions, notify SOC + compliance.",
+    "auto_contained": true,
+    "ground_truth_label": "malicious"
+  },
+  {
+    "alert_id": "ALT-0006",
+    "employee_id": "EMP023",
+    "employee_name": "Yuki X.",
+    "department": "Wealth Management",
+    "role": "Financial Advisor",
+    "date": "2026-06-14",
+    "risk_score": 84.0,
+    "severity": "high",
+    "confidence_pct": 85.2,
+    "rule_score": 98.5,
+    "isolation_forest_score": 66.4,
+    "xai_reasons": [
+      {
+        "factor": "Accessed high-value / VIP customer records",
+        "evidence": "vip_record_access = 39",
+        "weight_pct": 87.5
+      },
+      {
+        "factor": "Elevated number of admin commands",
+        "evidence": "admin_commands = 6",
+        "weight_pct": 12.4
+      }
+    ],
+    "recommended_action": "Escalate to SOC analyst for manual review within 1 hour; flag manager.",
+    "auto_contained": false,
+    "ground_truth_label": "malicious"
+  },
+  {
+    "alert_id": "ALT-0008",
+    "employee_id": "EMP038",
+    "employee_name": "Rosa M.",
+    "department": "Customer Support",
+    "role": "Support Lead",
+    "date": "2026-06-17",
+    "risk_score": 82.3,
+    "severity": "high",
+    "confidence_pct": 86.4,
+    "rule_score": 82.4,
+    "isolation_forest_score": 82.2,
+    "xai_reasons": [
+      {
+        "factor": "Elevated number of admin commands",
+        "evidence": "admin_commands = 18",
+        "weight_pct": 75.5
+      },
+      {
+        "factor": "Repeated failed login attempts",
+        "evidence": "failed_logins = 3",
+        "weight_pct": 20.0
+      },
+      {
+        "factor": "Isolation Forest flagged this behavior as a statistical outlier vs. peer baseline",
+        "evidence": "anomaly_score = 82.2/100",
+        "weight_pct": null
+      }
+    ],
+    "recommended_action": "Escalate to SOC analyst for manual review within 1 hour; flag manager.",
+    "auto_contained": false,
+    "ground_truth_label": "malicious"
+  },
+  {
+    "alert_id": "ALT-0002",
+    "employee_id": "EMP005",
+    "employee_name": "Ahmed F.",
+    "department": "Treasury",
+    "role": "Treasury Analyst",
+    "date": "2026-06-30",
+    "risk_score": 79.0,
+    "severity": "high",
+    "confidence_pct": 85.3,
+    "rule_score": 90.7,
+    "isolation_forest_score": 64.7,
+    "xai_reasons": [
+      {
+        "factor": "Abnormal database query volume",
+        "evidence": "db_queries = 468",
+        "weight_pct": 75.0
+      },
+      {
+        "factor": "Unusual volume of file downloads",
+        "evidence": "files_downloaded = 30",
+        "weight_pct": 22.2
+      }
+    ],
+    "recommended_action": "Escalate to SOC analyst for manual review within 1 hour; flag manager.",
+    "auto_contained": false,
+    "ground_truth_label": "malicious"
+  },
+  {
+    "alert_id": "ALT-0003",
+    "employee_id": "EMP011",
+    "employee_name": "Fatima L.",
+    "department": "Treasury",
+    "role": "Treasury Manager",
+    "date": "2026-06-20",
+    "risk_score": 77.7,
+    "severity": "high",
+    "confidence_pct": 85.4,
+    "rule_score": 87.8,
+    "isolation_forest_score": 65.4,
+    "xai_reasons": [
+      {
+        "factor": "Elevated number of admin commands",
+        "evidence": "admin_commands = 26",
+        "weight_pct": 95.5
+      }
+    ],
+    "recommended_action": "Escalate to SOC analyst for manual review within 1 hour; flag manager.",
+    "auto_contained": false,
+    "ground_truth_label": "malicious"
+  },
+  {
+    "alert_id": "ALT-0007",
+    "employee_id": "EMP031",
+    "employee_name": "Ivan F.",
+    "department": "Customer Support",
+    "role": "Support Lead",
+    "date": "2026-06-23",
+    "risk_score": 58.1,
+    "severity": "medium",
+    "confidence_pct": 77.3,
+    "rule_score": 56.5,
+    "isolation_forest_score": 60.1,
+    "xai_reasons": [
+      {
+        "factor": "Multiple/unusual source IP addresses used",
+        "evidence": "distinct_ip_count = 3",
+        "weight_pct": 63.4
+      },
+      {
+        "factor": "Repeated failed login attempts",
+        "evidence": "failed_logins = 3",
+        "weight_pct": 36.3
+      }
+    ],
+    "recommended_action": "Add to watchlist; increase monitoring sensitivity for 7 days.",
+    "auto_contained": false,
+    "ground_truth_label": "suspicious"
+  },
+  {
+    "alert_id": "ALT-0004",
+    "employee_id": "EMP014",
+    "employee_name": "Ravi O.",
+    "department": "Treasury",
+    "role": "Treasury Manager",
+    "date": "2026-06-25",
+    "risk_score": 44.8,
+    "severity": "medium",
+    "confidence_pct": 75.9,
+    "rule_score": 41.6,
+    "isolation_forest_score": 48.8,
+    "xai_reasons": [
+      {
+        "factor": "Accessed high-value / VIP customer records",
+        "evidence": "vip_record_access = 8",
+        "weight_pct": 98.8
+      }
+    ],
+    "recommended_action": "Add to watchlist; increase monitoring sensitivity for 7 days.",
+    "auto_contained": false,
+    "ground_truth_label": "suspicious"
+  }
+]</script>
+<script id="data-scenarios" type="application/json">[
+  {
+    "id": "sim-01",
+    "name": "Data Exfiltration Before Resignation",
+    "category": "Data Theft",
+    "description": "A departing employee downloads hundreds of client files in the days before their last day.",
+    "injected_features": {"files_accessed": 265, "files_downloaded": 210, "login_hour": 21.4, "off_hours_access": 1},
+    "expected_severity": "critical"
+  },
+  {
+    "id": "sim-02",
+    "name": "After-Hours Admin Command Spike",
+    "category": "Privileged Access Abuse",
+    "description": "A sysadmin account issues dozens of privileged commands at 2-4 AM, well outside normal shift hours.",
+    "injected_features": {"admin_commands": 24, "login_hour": 2.7, "off_hours_access": 1},
+    "expected_severity": "critical"
+  },
+  {
+    "id": "sim-03",
+    "name": "Mass USB Data Copy",
+    "category": "Data Theft",
+    "description": "An employee plugs in a USB device and transfers several gigabytes of files in one session.",
+    "injected_features": {"usb_events": 1, "usb_bytes_mb": 3200, "files_downloaded": 85},
+    "expected_severity": "critical"
+  },
+  {
+    "id": "sim-04",
+    "name": "Privilege Escalation & VIP Snooping",
+    "category": "Privileged Access Abuse",
+    "description": "A branch employee uses elevated access to view high-net-worth customer accounts unrelated to their job.",
+    "injected_features": {"vip_record_access": 28, "admin_commands": 7},
+    "expected_severity": "high"
+  },
+  {
+    "id": "sim-05",
+    "name": "Impossible Travel / Credential Sharing",
+    "category": "Account Compromise",
+    "description": "The same account logs in from multiple distant IP addresses within minutes, suggesting shared or stolen credentials.",
+    "injected_features": {"distinct_ip_count": 5, "session_count": 3, "failed_logins": 4},
+    "expected_severity": "high"
+  },
+  {
+    "id": "sim-06",
+    "name": "Bulk Customer Database Export",
+    "category": "Data Theft",
+    "description": "A database administrator runs an unusually large number of SELECT queries and exports the results.",
+    "injected_features": {"db_queries": 380, "files_downloaded": 18},
+    "expected_severity": "critical"
+  },
+  {
+    "id": "sim-07",
+    "name": "Sabotage Preparation (Log Tampering)",
+    "category": "Sabotage",
+    "description": "An insider disables monitoring agents and attempts to clear audit logs shortly before a planned action.",
+    "injected_features": {"admin_commands": 16, "failed_logins": 5, "off_hours_access": 1},
+    "expected_severity": "critical"
+  },
+  {
+    "id": "sim-08",
+    "name": "Gradual VIP Account Snooping",
+    "category": "Reconnaissance",
+    "description": "A slow-burn pattern of an employee viewing VIP customer records slightly more each day over two weeks.",
+    "injected_features": {"vip_record_access": 9, "files_accessed": 32},
+    "expected_severity": "medium"
+  },
+  {
+    "id": "sim-09",
+    "name": "Resignation Week Mass Exfiltration",
+    "category": "Data Theft",
+    "description": "In their final week, an employee combines mass downloads with a large USB transfer late at night.",
+    "injected_features": {"files_downloaded": 240, "usb_bytes_mb": 1400, "login_hour": 22.5, "off_hours_access": 1},
+    "expected_severity": "critical"
+  }
+]
+</script>
+<script id="data-summary" type="application/json">{
+  "risk_trend": [
+    {
+      "date": "2026-06-05",
+      "risk_score": 22.2
+    },
+    {
+      "date": "2026-06-06",
+      "risk_score": 19.5
+    },
+    {
+      "date": "2026-06-07",
+      "risk_score": 17.7
+    },
+    {
+      "date": "2026-06-08",
+      "risk_score": 20.1
+    },
+    {
+      "date": "2026-06-09",
+      "risk_score": 20.0
+    },
+    {
+      "date": "2026-06-10",
+      "risk_score": 19.0
+    },
+    {
+      "date": "2026-06-11",
+      "risk_score": 18.8
+    },
+    {
+      "date": "2026-06-12",
+      "risk_score": 21.2
+    },
+    {
+      "date": "2026-06-13",
+      "risk_score": 17.3
+    },
+    {
+      "date": "2026-06-14",
+      "risk_score": 19.2
+    },
+    {
+      "date": "2026-06-15",
+      "risk_score": 19.2
+    },
+    {
+      "date": "2026-06-16",
+      "risk_score": 21.2
+    },
+    {
+      "date": "2026-06-17",
+      "risk_score": 21.3
+    },
+    {
+      "date": "2026-06-18",
+      "risk_score": 18.3
+    },
+    {
+      "date": "2026-06-19",
+      "risk_score": 21.1
+    },
+    {
+      "date": "2026-06-20",
+      "risk_score": 20.1
+    },
+    {
+      "date": "2026-06-21",
+      "risk_score": 16.5
+    },
+    {
+      "date": "2026-06-22",
+      "risk_score": 19.5
+    },
+    {
+      "date": "2026-06-23",
+      "risk_score": 21.4
+    },
+    {
+      "date": "2026-06-24",
+      "risk_score": 20.1
+    },
+    {
+      "date": "2026-06-25",
+      "risk_score": 22.3
+    },
+    {
+      "date": "2026-06-26",
+      "risk_score": 20.2
+    },
+    {
+      "date": "2026-06-27",
+      "risk_score": 19.7
+    },
+    {
+      "date": "2026-06-28",
+      "risk_score": 18.1
+    },
+    {
+      "date": "2026-06-29",
+      "risk_score": 19.7
+    },
+    {
+      "date": "2026-06-30",
+      "risk_score": 22.6
+    },
+    {
+      "date": "2026-07-01",
+      "risk_score": 19.9
+    },
+    {
+      "date": "2026-07-02",
+      "risk_score": 23.2
+    },
+    {
+      "date": "2026-07-03",
+      "risk_score": 21.2
+    },
+    {
+      "date": "2026-07-04",
+      "risk_score": 19.1
+    }
+  ],
+  "department_comparison": [
+    {
+      "department": "Compliance",
+      "risk_score": 19.1
+    },
+    {
+      "department": "Customer Support",
+      "risk_score": 19.4
+    },
+    {
+      "department": "IT Operations",
+      "risk_score": 24.6
+    },
+    {
+      "department": "Loan Processing",
+      "risk_score": 17.9
+    },
+    {
+      "department": "Retail Banking",
+      "risk_score": 18.3
+    },
+    {
+      "department": "Treasury",
+      "risk_score": 20.3
+    },
+    {
+      "department": "Wealth Management",
+      "risk_score": 21.4
+    }
+  ],
+  "leaderboard": [
+    {
+      "employee_id": "EMP042",
+      "risk_score": 100.0,
+      "name": "Nadia Q.",
+      "department": "Wealth Management",
+      "role": "Financial Advisor"
+    },
+    {
+      "employee_id": "EMP019",
+      "risk_score": 95.2,
+      "name": "Grace T.",
+      "department": "IT Operations",
+      "role": "Sysadmin"
+    },
+    {
+      "employee_id": "EMP004",
+      "risk_score": 88.5,
+      "name": "Sarah E.",
+      "department": "Retail Banking",
+      "role": "Teller"
+    },
+    {
+      "employee_id": "EMP023",
+      "risk_score": 84.0,
+      "name": "Yuki X.",
+      "department": "Wealth Management",
+      "role": "Financial Advisor"
+    },
+    {
+      "employee_id": "EMP038",
+      "risk_score": 82.3,
+      "name": "Rosa M.",
+      "department": "Customer Support",
+      "role": "Support Lead"
+    },
+    {
+      "employee_id": "EMP005",
+      "risk_score": 79.0,
+      "name": "Ahmed F.",
+      "department": "Treasury",
+      "role": "Treasury Analyst"
+    },
+    {
+      "employee_id": "EMP011",
+      "risk_score": 77.7,
+      "name": "Fatima L.",
+      "department": "Treasury",
+      "role": "Treasury Manager"
+    },
+    {
+      "employee_id": "EMP031",
+      "risk_score": 58.1,
+      "name": "Ivan F.",
+      "department": "Customer Support",
+      "role": "Support Lead"
+    },
+    {
+      "employee_id": "EMP026",
+      "risk_score": 56.4,
+      "name": "Layla A.",
+      "department": "Compliance",
+      "role": "Auditor"
+    },
+    {
+      "employee_id": "EMP028",
+      "risk_score": 52.4,
+      "name": "Mei C.",
+      "department": "Treasury",
+      "role": "Treasury Manager"
+    }
+  ],
+  "total_employees": 45,
+  "total_alerts": 9,
+  "critical_count": 3,
+  "high_count": 4,
+  "medium_count": 2
+}</script>
+
+<script>
+// ===================== DATA LOAD =====================
+const EMPLOYEES = JSON.parse(document.getElementById('data-employees').textContent);
+const SEED_ALERTS = JSON.parse(document.getElementById('data-alerts').textContent);
+const SCENARIOS = JSON.parse(document.getElementById('data-scenarios').textContent);
+const SUMMARY = JSON.parse(document.getElementById('data-summary').textContent);
+
+let alerts = SEED_ALERTS.map(a => ({...a, status: 'open'}));
+let lockedAccounts = new Set(alerts.filter(a => a.auto_contained).map(a => a.employee_id));
+let simCounter = 1;
+
+// population baseline stats for client-side risk scoring (mirrors backend ml/risk_engine.py)
+const POP_MEAN = {
+  files_downloaded: 5.2, usb_bytes_mb: 3.4, admin_commands: 1.6,
+  vip_record_access: 0.9, distinct_ip_count: 1.1, failed_logins: 0.2, db_queries: 5.1,
+};
+const POP_STD = {
+  files_downloaded: 6.8, usb_bytes_mb: 22.5, admin_commands: 3.1,
+  vip_record_access: 1.8, distinct_ip_count: 0.5, failed_logins: 0.5, db_queries: 6.4,
+};
+const RULE_WEIGHTS = {
+  files_downloaded_z: 0.20, usb_bytes_z: 0.18, admin_commands_z: 0.15, off_hours_access: 0.10,
+  vip_record_access_z: 0.13, distinct_ip_count_z: 0.10, failed_logins_z: 0.07, db_queries_z: 0.07,
+};
+const XAI_LABELS = {
+  files_downloaded_z: ["Unusual volume of file downloads", "files_downloaded"],
+  usb_bytes_z: ["Large USB data transfer detected", "usb_bytes_mb"],
+  admin_commands_z: ["Elevated number of admin commands", "admin_commands"],
+  off_hours_access: ["Access occurred outside normal working hours", "login_hour"],
+  vip_record_access_z: ["Accessed high-value / VIP customer records", "vip_record_access"],
+  distinct_ip_count_z: ["Multiple/unusual source IP addresses used", "distinct_ip_count"],
+  failed_logins_z: ["Repeated failed login attempts", "failed_logins"],
+  db_queries_z: ["Abnormal database query volume", "db_queries"],
+};
+const BASELINE_EVENT = {
+  login_hour: 8.5, files_accessed: 18, files_downloaded: 3, db_queries: 3,
+  usb_events: 0, usb_bytes_mb: 0.0, admin_commands: 0, failed_logins: 0,
+  off_hours_access: 0, vip_record_access: 0, distinct_ip_count: 1, session_count: 1,
+};
+
+function zscore(feature, value) {
+  return Math.max(0, (value - POP_MEAN[feature]) / POP_STD[feature]);
+}
+
+function scoreEvent(event) {
+  const z = {
+    files_downloaded_z: zscore('files_downloaded', event.files_downloaded),
+    usb_bytes_z: zscore('usb_bytes_mb', event.usb_bytes_mb),
+    admin_commands_z: zscore('admin_commands', event.admin_commands),
+    off_hours_access: event.off_hours_access,
+    vip_record_access_z: zscore('vip_record_access', event.vip_record_access),
+    distinct_ip_count_z: zscore('distinct_ip_count', event.distinct_ip_count),
+    failed_logins_z: zscore('failed_logins', event.failed_logins),
+    db_queries_z: zscore('db_queries', event.db_queries),
+  };
+  let raw = 0;
+  for (const k in RULE_WEIGHTS) raw += z[k] * RULE_WEIGHTS[k];
+  const ruleScore = 100 / (1 + Math.exp(-1.1 * (raw - 1.2)));
+
+  // simplified isolation-forest-style anomaly proxy: combine feature rarity
+  const anomalyRaw = (z.files_downloaded_z + z.usb_bytes_z + z.admin_commands_z +
+                       z.vip_record_access_z + z.distinct_ip_count_z + z.db_queries_z) / 3.2;
+  const ifScore = Math.min(100, anomalyRaw * 32 + (event.off_hours_access ? 12 : 0));
+
+  const riskScore = Math.round((0.55 * ruleScore + 0.45 * ifScore) * 10) / 10;
+
+  const contributions = {};
+  for (const k in RULE_WEIGHTS) contributions[k] = z[k] * RULE_WEIGHTS[k];
+  const totalPos = Object.values(contributions).filter(v => v > 0).reduce((a,b)=>a+b, 0) || 1;
+
+  const reasons = Object.entries(contributions)
+    .sort((a,b) => b[1]-a[1])
+    .filter(([k,v]) => v > 0.15)
+    .map(([k,v]) => {
+      const [text, col] = XAI_LABELS[k];
+      return { factor: text, evidence: `${col} = ${event[col]}`, weight_pct: Math.round(v/totalPos*1000)/10 };
+    });
+  if (ifScore > 70) {
+    reasons.push({ factor: "Isolation Forest flagged this behavior as a statistical outlier vs. peer baseline",
+                   evidence: `anomaly_score = ${Math.round(ifScore*10)/10}/100`, weight_pct: null });
+  }
+  if (reasons.length === 0) reasons.push({ factor: "Behavior within normal historical range", evidence: "-", weight_pct: null });
+
+  let severity, action;
+  if (riskScore >= 85) { severity='critical'; action='AUTO-CONTAIN: Lock account immediately, revoke active sessions, notify SOC + compliance.'; }
+  else if (riskScore >= 60) { severity='high'; action='Escalate to SOC analyst for manual review within 1 hour; flag manager.'; }
+  else if (riskScore >= 35) { severity='medium'; action='Add to watchlist; increase monitoring sensitivity for 7 days.'; }
+  else { severity='low'; action='No action required.'; }
+
+  return { rule_score: Math.round(ruleScore*10)/10, isolation_forest_score: Math.round(ifScore*10)/10,
+           risk_score: riskScore, severity, recommended_action: action, xai_reasons: reasons,
+           auto_contained: riskScore >= 85 };
+}
+
+// ===================== TABS =====================
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('view-' + tab.dataset.view).classList.add('active');
+  });
+});
+
+// ===================== OVERVIEW =====================
+function renderOverview() {
+  document.getElementById('k-employees').textContent = SUMMARY.total_employees;
+  document.getElementById('k-alerts').textContent = alerts.length;
+  document.getElementById('k-critical').textContent = alerts.filter(a=>a.severity==='critical').length;
+  document.getElementById('k-high').textContent = alerts.filter(a=>a.severity==='high').length;
+  document.getElementById('k-locked').textContent = lockedAccounts.size;
+  document.getElementById('pill-alerts').textContent = alerts.filter(a=>a.status==='open').length + ' open alerts';
+
+  const lb = SUMMARY.leaderboard.slice(0, 10);
+  document.getElementById('leaderboard-body').innerHTML = lb.map(e => `
+    <tr class="rowhover">
+      <td><b>${e.name}</b></td><td>${e.department}</td><td style="color:var(--muted)">${e.role}</td>
+      <td><span class="gauge-num" style="color:${riskColor(e.risk_score)}">${e.risk_score}</span></td>
+    </tr>`).join('');
+}
+
+function riskColor(score) {
+  if (score >= 85) return 'var(--crimson)';
+  if (score >= 60) return 'var(--amber)';
+  if (score >= 35) return 'var(--cyan)';
+  return 'var(--green)';
+}
+
+let trendChart, deptChart;
+function renderCharts() {
+  const trendCtx = document.getElementById('chart-trend').getContext('2d');
+  trendChart = new Chart(trendCtx, {
+    type: 'line',
+    data: {
+      labels: SUMMARY.risk_trend.map(d => d.date.slice(5)),
+      datasets: [{ data: SUMMARY.risk_trend.map(d => d.risk_score), borderColor: '#43e7de',
+        backgroundColor: 'rgba(67,231,222,.08)', fill: true, tension: .35, pointRadius: 0, borderWidth: 2 }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: '#4d5a72', maxTicksLimit: 8 }, grid: { color: '#1a2436' } },
+                y: { ticks: { color: '#4d5a72' }, grid: { color: '#1a2436' } } } }
+  });
+
+  const deptCtx = document.getElementById('chart-dept').getContext('2d');
+  deptChart = new Chart(deptCtx, {
+    type: 'bar',
+    data: {
+      labels: SUMMARY.department_comparison.map(d => d.department),
+      datasets: [{ data: SUMMARY.department_comparison.map(d => d.risk_score),
+        backgroundColor: '#a78bfa', borderRadius: 6, maxBarThickness: 34 }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: '#4d5a72', font:{size:9}, maxRotation: 30, minRotation:30 }, grid: { display:false } },
+                y: { ticks: { color: '#4d5a72' }, grid: { color: '#1a2436' } } } }
+  });
+}
+
+// ===================== ALERTS =====================
+let alertFilter = 'all';
+function renderAlerts() {
+  const list = document.getElementById('alert-list');
+  const filtered = alertFilter === 'all' ? alerts : alerts.filter(a => a.severity === alertFilter);
+  const sorted = [...filtered].sort((a,b) => b.risk_score - a.risk_score);
+  list.innerHTML = sorted.map(a => alertRowHtml(a)).join('');
+  list.querySelectorAll('.alert-row').forEach(row => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.btn')) return;
+      row.classList.toggle('open');
+    });
+  });
+  list.querySelectorAll('[data-action]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id, act = btn.dataset.action;
+      const alert = alerts.find(a => a.alert_id === id);
+      if (act === 'lock') { lockedAccounts.add(alert.employee_id); alert.auto_contained = true; }
+      if (act === 'review') alert.status = 'reviewing';
+      if (act === 'resolve') alert.status = 'resolved';
+      renderAlerts(); renderOverview();
+    });
+  });
+}
+
+function alertRowHtml(a) {
+  const reasonsHtml = a.xai_reasons.map(r => `
+    <div class="factor">
+      <div>
+        <div class="f-name">${r.factor}</div>
+        <div class="f-ev">${r.evidence}</div>
+      </div>
+      ${r.weight_pct != null ? `<div class="gauge-wrap"><div class="bar-bg"><div class="bar-fill" style="width:${Math.min(100,r.weight_pct)}%"></div></div><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${r.weight_pct}%</span></div>` : ''}
+    </div>`).join('');
+  const locked = lockedAccounts.has(a.employee_id);
+  return `
+    <div class="alert-row" data-id="${a.alert_id}">
+      <div class="top">
+        <div>
+          <div class="who">${a.employee_name} <span class="tagchip">${a.employee_id}</span> ${locked ? '<span class="tagchip" style="color:var(--crimson);border-color:rgba(255,84,112,.4)">LOCKED</span>' : ''}</div>
+          <div class="meta">${a.department} · ${a.role} · ${a.date} · status: ${a.status}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="gauge-num" style="color:${riskColor(a.risk_score)}">${a.risk_score}</span>
+          <span class="sev ${a.severity}">${a.severity}</span>
+        </div>
+      </div>
+      <div class="alert-detail">
+        <div style="display:flex;gap:18px;margin-bottom:10px;font-size:11.5px;color:var(--muted);font-family:var(--mono);">
+          <span>rule_score: <b style="color:var(--cyan)">${a.rule_score}</b></span>
+          <span>isolation_forest: <b style="color:var(--violet)">${a.isolation_forest_score}</b></span>
+          <span>confidence: <b style="color:var(--text)">${a.confidence_pct}%</b></span>
+        </div>
+        ${reasonsHtml}
+        <div class="action-box"><b>Recommended action:</b> ${a.recommended_action}</div>
+        <div class="btnrow">
+          ${!locked ? `<button class="btn danger" data-action="lock" data-id="${a.alert_id}">Lock Account</button>` : ''}
+          <button class="btn" data-action="review" data-id="${a.alert_id}">Mark Reviewing</button>
+          <button class="btn" data-action="resolve" data-id="${a.alert_id}">Resolve</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+document.querySelectorAll('#alert-filters .tagchip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    alertFilter = chip.dataset.f;
+    document.querySelectorAll('#alert-filters .tagchip').forEach(c => c.style.color = 'var(--muted)');
+    chip.style.color = 'var(--cyan)';
+    renderAlerts();
+  });
+});
+
+// ===================== SIMULATOR =====================
+function renderSimulator() {
+  const grid = document.getElementById('sim-grid');
+  grid.innerHTML = SCENARIOS.map(s => `
+    <div class="sim-card">
+      <div class="cat">${s.category}</div>
+      <h4>${s.name}</h4>
+      <p>${s.description}</p>
+      <button class="btn primary" data-sim="${s.id}">Run Scenario</button>
+    </div>`).join('');
+  grid.querySelectorAll('[data-sim]').forEach(btn => {
+    btn.addEventListener('click', () => runScenario(btn.dataset.sim, btn));
+  });
+}
+
+async function runScenario(id, btn) {
+  btn.disabled = true; btn.textContent = 'Running…';
+  const scenario = SCENARIOS.find(s => s.id === id);
+  const emp = EMPLOYEES[Math.floor(Math.random() * EMPLOYEES.length)];
+  const event = { ...BASELINE_EVENT, ...scenario.injected_features };
+  await new Promise(r => setTimeout(r, 650)); // let it feel like it's actually running the engine
+  const result = scoreEvent(event);
+
+  const newAlert = {
+    alert_id: `SIM-${String(simCounter++).padStart(4,'0')}`,
+    employee_id: emp.employee_id, employee_name: emp.name, department: emp.department, role: emp.role,
+    date: 'simulation', risk_score: result.risk_score, severity: result.severity,
+    confidence_pct: Math.round((60 + result.risk_score/3)*10)/10,
+    rule_score: result.rule_score, isolation_forest_score: result.isolation_forest_score,
+    xai_reasons: result.xai_reasons, recommended_action: result.recommended_action,
+    auto_contained: result.auto_contained, status: 'open',
+  };
+  alerts.unshift(newAlert);
+  if (result.auto_contained) lockedAccounts.add(emp.employee_id);
+  appendAuditEntry('system(simulator)', 'SIMULATOR_RUN', { scenario: scenario.name, target: emp.employee_id, risk_score: result.risk_score });
+
+  const box = document.getElementById('sim-result');
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div><b>${scenario.name}</b> → <span style="color:var(--muted)">${emp.name} (${emp.department})</span></div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <span class="gauge-num" style="color:${riskColor(result.risk_score)}">${result.risk_score}</span>
+        <span class="sev ${result.severity}">${result.severity}</span>
+      </div>
+    </div>
+    ${result.xai_reasons.map(r => `<div class="factor"><div><div class="f-name">${r.factor}</div><div class="f-ev">${r.evidence}</div></div>${r.weight_pct!=null?`<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${r.weight_pct}%</span>`:''}</div>`).join('')}
+    <div class="action-box"><b>Recommended action:</b> ${result.recommended_action}</div>
+    <div class="footnote">Alert <code>${newAlert.alert_id}</code> added to the Alerts tab and logged to the PQC audit chain.</div>
+  `;
+  btn.disabled = false; btn.textContent = 'Run Scenario';
+  renderOverview(); renderAlerts();
+}
+
+// ===================== AUDIT LOG (real SHA-256 chaining in-browser) =====================
+let auditChain = [];
+
+async function sha256(text) {
+  const enc = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function appendAuditEntry(actor, action, payload) {
+  const prevHash = auditChain.length ? auditChain[auditChain.length-1].entry_hash : 'GENESIS';
+  const body = JSON.stringify({ prev_hash: prevHash, actor, action, payload });
+  const entry_hash = await sha256(body);
+  const signature = (await sha256(entry_hash + actor)).slice(0, 24); // simulated HBS signature
+  auditChain.push({ ts: new Date().toISOString().slice(0,19).replace('T',' '), actor, action, payload, prev_hash: prevHash, entry_hash, signature });
+  renderAudit();
+}
+
+function renderAudit() {
+  const body = document.getElementById('ledger-body');
+  body.innerHTML = [...auditChain].reverse().map((e, idx) => `
+    <div class="ledger-row">
+      <div class="hash">${e.ts.slice(11)}</div>
+      <div class="action">${e.action}</div>
+      <div class="hash">hash: ${e.entry_hash.slice(0,16)}… <span class="chain-link">← prev ${e.prev_hash.slice(0,10)}…</span></div>
+      <div class="hash" title="${e.signature}">sig: ${e.signature.slice(0,10)}…</div>
+    </div>`).join('');
+  document.getElementById('pill-chain').textContent = 'verified';
+}
+
+async function verifyChain() {
+  let prevHash = 'GENESIS';
+  for (const e of auditChain) {
+    const body = JSON.stringify({ prev_hash: prevHash, actor: e.actor, action: e.action, payload: e.payload });
+    const recomputed = await sha256(body);
+    if (recomputed !== e.entry_hash || e.prev_hash !== prevHash) return { valid: false, brokenAt: e.action };
+    prevHash = e.entry_hash;
+  }
+  return { valid: true };
+}
+
+document.getElementById('btn-verify').addEventListener('click', async () => {
+  const result = await verifyChain();
+  const el = document.getElementById('verify-result');
+  if (result.valid) {
+    el.innerHTML = `<span class="verify-badge ok">✓ Chain valid — ${auditChain.length} entries, all hashes and signatures match</span>`;
+    document.getElementById('pill-chain').textContent = 'verified';
+  } else {
+    el.innerHTML = `<span class="verify-badge bad">✕ Chain broken at "${result.brokenAt}" — tampering detected</span>`;
+    document.getElementById('pill-chain').textContent = 'COMPROMISED';
+  }
+});
+
+document.getElementById('btn-tamper').addEventListener('click', () => {
+  if (auditChain.length < 2) return;
+  // mutate a past entry's payload without recomputing the hash chain, to demonstrate detection
+  const target = auditChain[Math.floor(auditChain.length/2)];
+  target.payload = { ...target.payload, tampered: true, note: "altered after the fact" };
+  document.getElementById('verify-result').innerHTML = `<span class="verify-badge bad">⚠ Entry mutated in memory — click "Verify Chain Integrity" to detect it</span>`;
+});
+
+// ===================== AI ASSISTANT =====================
+function assistantAnswer(q) {
+  const ql = q.toLowerCase();
+  if (/how many alert|total alert|open alert/.test(ql)) {
+    const open = alerts.filter(a => a.status === 'open').length;
+    return `There are ${alerts.length} alerts on record, ${open} still open.`;
+  }
+  if (ql.includes('critical')) {
+    const rows = alerts.filter(a => a.severity === 'critical').sort((a,b)=>b.risk_score-a.risk_score);
+    if (!rows.length) return 'No critical alerts right now.';
+    return `${rows.length} critical alert(s): ` + rows.slice(0,5).map(r => `${r.employee_name} (${r.department}, risk ${r.risk_score})`).join(', ') + '.';
+  }
+  if (ql.includes('locked')) {
+    if (!lockedAccounts.size) return 'No accounts are currently locked.';
+    const names = [...lockedAccounts].map(id => {
+      const a = alerts.find(x => x.employee_id === id);
+      return a ? `${a.employee_name} (${id})` : id;
+    });
+    return `${lockedAccounts.size} account(s) locked: ${names.join(', ')}.`;
+  }
+  if (/riskiest|highest risk|top risk/.test(ql)) {
+    const top = SUMMARY.leaderboard[0];
+    return `The highest observed risk score belongs to ${top.name} (${top.department}) at ${top.risk_score}/100.`;
+  }
+  const deptMatch = SUMMARY.department_comparison.find(d => ql.includes(d.department.toLowerCase()));
+  if (deptMatch) {
+    const count = alerts.filter(a => a.department === deptMatch.department).length;
+    return `${deptMatch.department} has an average risk score of ${deptMatch.risk_score} and ${count} alert(s) on record.`;
+  }
+  if (ql.includes('audit') && (ql.includes('secure')||ql.includes('tamper')||ql.includes('quantum')||ql.includes('proof'))) {
+    return "Every audit log entry is chained (SHA-256) and signed with a post-quantum-style signature (Dilithium3 in production via liboqs, or the built-in hash-based simulator in local dev / this demo). Try the Audit Log tab: click 'Simulate Tampering' then 'Verify Chain Integrity' to see it get caught.";
+  }
+  return "I can answer questions about alerts, critical incidents, locked accounts, the highest-risk employee, per-department risk, or audit-log integrity. Try one of the suggestions below.";
+}
+
+function addChatMsg(text, who) {
+  const log = document.getElementById('chatlog');
+  const div = document.createElement('div');
+  div.className = 'msg ' + who;
+  div.textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function handleAsk(text) {
+  if (!text.trim()) return;
+  addChatMsg(text, 'user');
+  setTimeout(() => addChatMsg(assistantAnswer(text), 'bot'), 350);
+}
+
+document.getElementById('chat-send').addEventListener('click', () => {
+  const input = document.getElementById('chat-input');
+  handleAsk(input.value); input.value = '';
+});
+document.getElementById('chat-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { handleAsk(e.target.value); e.target.value = ''; }
+});
+document.querySelectorAll('.suggest span').forEach(s => {
+  s.addEventListener('click', () => handleAsk(s.textContent));
+});
+
+// ===================== INIT =====================
+async function init() {
+  renderOverview();
+  renderCharts();
+  renderAlerts();
+  renderSimulator();
+  await appendAuditEntry('system', 'DATASET_SEEDED', { employees: SUMMARY.total_employees, alerts: alerts.length });
+  for (const a of alerts.filter(x => x.auto_contained)) {
+    await appendAuditEntry('system', 'ACCOUNT_LOCKED', { employee_id: a.employee_id, alert_id: a.alert_id });
+  }
+  addChatMsg("Hi, I'm the QuantumShield security assistant. Ask me about alerts, risk, or the audit log.", 'bot');
+}
+init();
+
+</script>
+</body>
+</html>
